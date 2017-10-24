@@ -1,0 +1,44 @@
+import com.bmuschko.gradle.docker.tasks.image.DockerPullImage
+import com.bmuschko.gradle.docker.tasks.container.DockerCreateContainer
+import com.bmuschko.gradle.docker.tasks.container.DockerStartContainer
+import com.bmuschko.gradle.docker.tasks.container.DockerStopContainer
+
+buildscript {
+    dependencies {
+        classpath 'org.postgresql:postgresql:42.1.4'
+    }
+}
+
+plugins {
+    id "org.flywaydb.flyway" version "4.2.0"
+    id "com.bmuschko.docker-remote-api" version "3.2.0"    
+}
+
+flyway {
+    url = 'jdbc:postgresql://127.0.0.1/gis'
+    user = 'docker'
+    password = 'docker'
+}
+
+task pullPostgresDockerImage(type: DockerPullImage) { 
+    repository = 'kartoza/postgis'
+    tag = '10.0-2.4'
+}
+
+task createPostgresDockerContainer(dependsOn: 'pullPostgresDockerImage', type: DockerCreateContainer) {
+    targetImageId { pullPostgresDockerImage.getImageId() }
+    portBindings = ['5432:5432']
+}
+
+task startPostgresDockerContainer(dependsOn: 'createPostgresDockerContainer', type: DockerStartContainer) {
+    targetContainerId { createPostgresDockerContainer.getContainerId() }
+    // Starting the database server takes some time
+    // and is not equal to docker container has started.
+    doLast { 
+        sleep(15*1000)
+    }
+}
+
+task stopPostgresDockerContainer(type: DockerStopContainer) { 
+    targetContainerId { startPostgresDockerContainer.getContainerId() }
+}
